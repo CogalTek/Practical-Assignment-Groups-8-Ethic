@@ -1,5 +1,6 @@
 import pygame
 from src.assets import load_images
+from src.tools import click_debug
 
 # Initialisation de Pygame
 pygame.init()
@@ -15,6 +16,7 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        click_debug(event)
 
     for key, data in images.items():
         screen.blit(data["image"], data["position"])
