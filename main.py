@@ -43,6 +43,4 @@ while running:
     pygame.display.flip()
     clock.tick(10)
 
-    # test / demo
-
 pygame.quit()
