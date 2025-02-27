@@ -18,7 +18,8 @@ def load_images():
             "default_index": 3,
             "max-index": 7,
             "player": True,
-            "floor": 0
+            "floor": 0,
+            "target": None
         },
         "npc01": {
             "image": pygame.image.load(path + "neighbor1.png"),
