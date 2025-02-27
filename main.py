@@ -22,7 +22,7 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        # click_debug(event)
+        click_debug(event)
 
     for key, data in images.items():
         screen.blit(data["image"], data["position"])

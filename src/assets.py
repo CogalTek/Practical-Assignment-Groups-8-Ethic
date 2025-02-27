@@ -19,6 +19,56 @@ def load_images():
             "max-index": 7,
             "player": True
         },
+        "npc01": {
+            "image": pygame.image.load(path + "neighbor1.png"),
+            "_original": pygame.image.load(path + "neighbor1.png"),
+            "position": (160, 461),
+            "size": (175, 66),
+            "sprite": (25, 66),
+            "index": 3,
+            "default_index": 3,
+            "npc": True
+        },
+        "npc02": {
+            "image": pygame.image.load(path + "neighbor2.png"),
+            "_original": pygame.image.load(path + "neighbor2.png"),
+            "position": (421, 388),
+            "size": (175, 66),
+            "sprite": (25, 66),
+            "index": 3,
+            "default_index": 3,
+            "npc": True
+        },
+        "npc03": {
+            "image": pygame.image.load(path + "neighbor3.png"),
+            "_original": pygame.image.load(path + "neighbor3.png"),
+            "position": (75, 314),
+            "size": (175, 66),
+            "sprite": (25, 66),
+            "index": 3,
+            "default_index": 3,
+            "npc": True
+        },
+        "npc04": {
+            "image": pygame.image.load(path + "neighbor4.png"),
+            "_original": pygame.image.load(path + "neighbor4.png"),
+            "position": (160, 242),
+            "size": (175, 66),
+            "sprite": (25, 66),
+            "index": 3,
+            "default_index": 3,
+            "npc": True
+        },
+        "npc05": {
+            "image": pygame.image.load(path + "neighbor5.png"),
+            "_original": pygame.image.load(path + "neighbor5.png"),
+            "position": (421, 168),
+            "size": (175, 66),
+            "sprite": (25, 66),
+            "index": 3,
+            "default_index": 3,
+            "npc": True
+        }
     }
     resize(image)
     # extract_sprites(image)
