@@ -1,40 +1,40 @@
 import pygame
 
 def handle_movement(player, keys):
-    # print("handle_movement")
+    elevator = (243, 287)
+    floor = [552, 461, 387, 314, 241, 166]
+    border = (50, 530)
     i = 0
     if keys:
-        # print("pressed")
-        i += move_left(player, keys)
-        i += move_right(player, keys)
+        i += move_left(player, keys, border)
+        i += move_right(player, keys, border)
+        i += move_up_elevator(player, keys, elevator, floor)
+        i += move_down_elevator(player, keys, elevator, floor)
 
-    # print("i = ", i)
     if i == 0:
-        # print("reset")
         reset_rect(player)
 
-def move_left(player, keys):
+def move_left(player, keys, border):
     if keys[pygame.K_LEFT]:
         pos = list(player["position"])
-        pos[0] -= 10
+        left, _ = border
+        if pos[0] > left:
+            pos[0] -= 10
         player["position"] = tuple(pos)
 
         if (player["index"] > 3 or player["index"] == 0):
             player["index"] = 2
-            # print("reset")
         else:
-            # print(player["index"])
             player["index"] = player["index"] - 1
-            # print("left")
-        # print(player["index"])
         return 1
-    # print("left return 0")
     return 0
 
-def move_right(player, keys):
+def move_right(player, keys, border):
     if keys[pygame.K_RIGHT]:
         pos = list(player["position"])
-        pos[0] += 10
+        _, right = border
+        if pos[0] < right:
+            pos[0] += 10
         player["position"] = tuple(pos)
 
         if (player["index"] < 3 or player["index"] == 6):
@@ -42,7 +42,30 @@ def move_right(player, keys):
         else:
             player["index"] = player["index"] + 1
         return 1
-    # print("right return 0")
+    return 0
+
+def move_up_elevator(player, keys, elevator, floor):
+    if keys[pygame.K_UP]:
+        pos = list(player["position"])
+        left, right = elevator
+        if pos[0] > left and pos[0] < right:
+            if player["floor"] < len(floor) - 1:
+                player["floor"] += 1
+                pos[1] = floor[player["floor"]]
+                player["position"] = tuple(pos)
+                return 1
+    return 0
+
+def move_down_elevator(player, keys, elevator, floor):
+    if keys[pygame.K_DOWN]:
+        pos = list(player["position"])
+        left, right = elevator
+        if pos[0] > left and pos[0] < right:
+            if player["floor"] > 0:
+                player["floor"] -= 1
+                pos[1] = floor[player["floor"]]
+                player["position"] = tuple(pos)
+                return 1
     return 0
 
 def reset_rect(player):

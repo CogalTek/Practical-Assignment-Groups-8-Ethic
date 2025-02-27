@@ -17,7 +17,8 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "max-index": 7,
-            "player": True
+            "player": True,
+            "floor": 0
         },
         "npc01": {
             "image": pygame.image.load(path + "neighbor1.png"),
@@ -27,7 +28,8 @@ def load_images():
             "sprite": (25, 66),
             "index": 3,
             "default_index": 3,
-            "npc": True
+            "npc": True,
+            "floor": 1
         },
         "npc02": {
             "image": pygame.image.load(path + "neighbor2.png"),
@@ -37,7 +39,8 @@ def load_images():
             "sprite": (25, 66),
             "index": 3,
             "default_index": 3,
-            "npc": True
+            "npc": True,
+            "floor": 2
         },
         "npc03": {
             "image": pygame.image.load(path + "neighbor3.png"),
@@ -47,7 +50,8 @@ def load_images():
             "sprite": (25, 66),
             "index": 3,
             "default_index": 3,
-            "npc": True
+            "npc": True,
+            "floor": 3
         },
         "npc04": {
             "image": pygame.image.load(path + "neighbor4.png"),
@@ -57,7 +61,8 @@ def load_images():
             "sprite": (25, 66),
             "index": 3,
             "default_index": 3,
-            "npc": True
+            "npc": True,
+            "floor": 4
         },
         "npc05": {
             "image": pygame.image.load(path + "neighbor5.png"),
@@ -67,11 +72,11 @@ def load_images():
             "sprite": (25, 66),
             "index": 3,
             "default_index": 3,
-            "npc": True
+            "npc": True,
+            "floor": 5
         }
     }
     resize(image)
-    # extract_sprites(image)
     return image
 
 def resize(images):
@@ -100,7 +105,6 @@ def update_rect(images):
             sprite_width, sprite_height = img_data["sprite"]
             target_width, target_height = img_data["size"]
             sprite_index = img_data["index"]
-            # print("sprite_index", sprite_index)
             sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
             tmp = img_data["_original"]
             tmp = pygame.transform.scale(tmp, (target_width, target_height))
@@ -108,7 +112,6 @@ def update_rect(images):
     return images  # Retourne le dictionnaire mis à jour
 
 def get_player(images):
-    # print(type(images))
     for key, img_data in images.items():
         if img_data.get("player", False):  # Vérifie si l'entrée a la clé "player" à True
             return key  # Retourne le nom de l'objet joueur
