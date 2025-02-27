@@ -1,5 +1,13 @@
 # Documentation
 
+Le projet est developper par :
+- Mathieu Rio
+- Arthur Bourdin
+- Rémi Maigrot
+
+Les assets présents dans Content, hors Music, appartiennent à l'utilisateur Grainbox.
+https://github.com/Grainbox
+
 ## Structure de base
 
 ### Main
