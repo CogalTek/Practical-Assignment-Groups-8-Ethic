@@ -10,15 +10,18 @@ def load_images():
         },
         "firstPlayer": {
             "image": pygame.image.load(path + "sprt_player.png"),
+            "_original": pygame.image.load(path + "sprt_player.png"),
             "position": (300, 552),
             "size": (175, 66),
             "sprite": (25, 66),
             "index": 3,
-            "max-index": 7
+            "default_index": 3,
+            "max-index": 7,
+            "player": True
         },
     }
-    image = resize(image)
-    image = extract_sprites(image)
+    resize(image)
+    # extract_sprites(image)
     return image
 
 def resize(images):
@@ -26,7 +29,6 @@ def resize(images):
         img_data = images[key]
         target_width, target_height = img_data["size"]
         images[key]["image"] = pygame.transform.scale(img_data["image"], (target_width, target_height))
-    return images
 
 def extract_sprites(images):
     for key in images:
@@ -41,4 +43,24 @@ def extract_sprites(images):
             # Extraire et remplacer l'image originale par le sprite extrait
             images[key]["image"] = images[key]["image"].subsurface(sprite_rect)
 
-    return images
+def update_rect(images):
+    """Met à jour les rect des images en fonction de l'index du sprite."""
+    for key, img_data in images.items():
+        if "sprite" in img_data:  # Vérifie si c'est une sprite sheet
+            sprite_width, sprite_height = img_data["sprite"]
+            target_width, target_height = img_data["size"]
+            sprite_index = img_data["index"]
+            # print("sprite_index", sprite_index)
+            sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
+            tmp = img_data["_original"]
+            tmp = pygame.transform.scale(tmp, (target_width, target_height))
+            images[key]["image"] = tmp.subsurface(sprite_rect)
+    return images  # Retourne le dictionnaire mis à jour
+
+def get_player(images):
+    # print(type(images))
+    for key, img_data in images.items():
+        if img_data.get("player", False):  # Vérifie si l'entrée a la clé "player" à True
+            return key  # Retourne le nom de l'objet joueur
+        print(key)
+    return None
