@@ -2,7 +2,7 @@ import pygame
 
 def load_images():
     path = "./content/"
-    image = {
+    images = {
         "background": {
             "image": pygame.image.load(path + "game-background.png"),
             "position": (0, 0),
@@ -19,7 +19,10 @@ def load_images():
             "max-index": 7,
             "player": True,
             "floor": 0,
-            "target": None
+            "target": None,
+            "id": "player",
+            "velocity": [0, 0],
+            "accelerating": False
         },
         "npc01": {
             "image": pygame.image.load(path + "neighbor1.png"),
@@ -30,7 +33,15 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "npc": True,
-            "floor": 1
+            "floor": 1,
+            "id": "npc01",
+            "velocity": [0, 0],
+            "behavior_state": "walking",
+            "current_goal": 0,
+            "idle_end": 0,
+            "anim_timer": 0,
+            "frame_index": 0,
+            "guilt": 0.1
         },
         "npc02": {
             "image": pygame.image.load(path + "neighbor2.png"),
@@ -41,7 +52,15 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "npc": True,
-            "floor": 2
+            "floor": 2,
+            "id": "npc02",
+            "velocity": [0, 0],
+            "behavior_state": "walking",
+            "current_goal": 0,
+            "idle_end": 0,
+            "anim_timer": 0,
+            "frame_index": 0,
+            "guilt": 0.2
         },
         "npc03": {
             "image": pygame.image.load(path + "neighbor3.png"),
@@ -52,7 +71,15 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "npc": True,
-            "floor": 3
+            "floor": 3,
+            "id": "npc03",
+            "velocity": [0, 0],
+            "behavior_state": "walking",
+            "current_goal": 0,
+            "idle_end": 0,
+            "anim_timer": 0,
+            "frame_index": 0,
+            "guilt": 0.8
         },
         "npc04": {
             "image": pygame.image.load(path + "neighbor4.png"),
@@ -63,7 +90,15 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "npc": True,
-            "floor": 4
+            "floor": 4,
+            "id": "npc04",
+            "velocity": [0, 0],
+            "behavior_state": "walking",
+            "current_goal": 0,
+            "idle_end": 0,
+            "anim_timer": 0,
+            "frame_index": 0,
+            "guilt": 0.4
         },
         "npc05": {
             "image": pygame.image.load(path + "neighbor5.png"),
@@ -74,47 +109,58 @@ def load_images():
             "index": 3,
             "default_index": 3,
             "npc": True,
-            "floor": 5
+            "floor": 5,
+            "id": "npc05",
+            "velocity": [0, 0],
+            "behavior_state": "walking",
+            "current_goal": 0,
+            "idle_end": 0,
+            "anim_timer": 0,
+            "frame_index": 0,
+            "guilt": 0.6
         }
     }
-    resize(image)
-    return image
+
+    # Post-traitement des images
+    resize(images)
+    update_rect(images)
+    return images
 
 def resize(images):
     for key in images:
         img_data = images[key]
-        target_width, target_height = img_data["size"]
-        images[key]["image"] = pygame.transform.scale(img_data["image"], (target_width, target_height))
-
-def extract_sprites(images):
-    for key in images:
-        img_data = images[key]
-        if "sprite" in img_data:  # Vérifie si c'est une sprite sheet
-            sprite_width, sprite_height = img_data["sprite"]
-            sprite_index = img_data.get("index", 0)  # Par défaut, prend le sprite 0
-
-            # Définir le rectangle du sprite à extraire
-            sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
-
-            # Extraire et remplacer l'image originale par le sprite extrait
-            images[key]["image"] = images[key]["image"].subsurface(sprite_rect)
+        if "size" in img_data:
+            target_size = img_data["size"]
+            img_data["image"] = pygame.transform.scale(img_data["image"], target_size)
+            if "_original" in img_data:
+                img_data["_original"] = pygame.transform.scale(img_data["_original"], target_size)
 
 def update_rect(images):
-    """Met à jour les rect des images en fonction de l'index du sprite."""
-    for key, img_data in images.items():
-        if "sprite" in img_data:  # Vérifie si c'est une sprite sheet
-            sprite_width, sprite_height = img_data["sprite"]
-            target_width, target_height = img_data["size"]
-            sprite_index = img_data["index"]
-            sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
-            tmp = img_data["_original"]
-            tmp = pygame.transform.scale(tmp, (target_width, target_height))
-            images[key]["image"] = tmp.subsurface(sprite_rect)
-    return images  # Retourne le dictionnaire mis à jour
+    for key in images:
+        img_data = images[key]
+        if "sprite" in img_data:
+            sprite_w, sprite_h = img_data["sprite"]
+            index = img_data["index"]
+            
+            original = img_data["_original"]
+            sprite_rect = pygame.Rect(
+                index * sprite_w,
+                0,
+                sprite_w,
+                sprite_h
+            )
+            img_data["image"] = original.subsurface(sprite_rect)
+            # Mettre à jour le rect de collision
+            img_data["rect"] = pygame.Rect(
+                img_data["position"][0], 
+                img_data["position"][1],
+                50,  # Largeur collision
+                66   # Hauteur collision
+            )
+    return images
 
 def get_player(images):
-    for key, img_data in images.items():
-        if img_data.get("player", False):  # Vérifie si l'entrée a la clé "player" à True
-            return key  # Retourne le nom de l'objet joueur
-        print(key)
+    for key, data in images.items():
+        if data.get("player", False):
+            return key
     return None
