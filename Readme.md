@@ -95,7 +95,6 @@ Practical-Assignment-Groups-8-Ethic/
 │   ├── detective.py              # AI detective algorithm
 │   ├── detective_game.py         # Main game visualization
 │   ├── movement_system.py        # Character movement and animations
-│   ├── setup.py                  # Setup utilities
 │   └── utils.py                  # General utility functions
 │
 ├── main.py                       # Entry point for the game
