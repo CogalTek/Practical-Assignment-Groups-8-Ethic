@@ -1,396 +1,351 @@
-# Documentation
+# AI Detective Game
 
-Le projet est developper par :
+## Project Overview
+
+This project is an interactive detective game that uses AI to investigate cases autonomously. The detective analyzes evidence, interrogates suspects, and makes deductions to solve mysteries. The game features:
+
+- Procedural generation of mystery cases with different crimes, suspects, and motives
+- AI detective that interrogates suspects and analyzes contradictions
+- Visual representation of the investigation process in a building with multiple floors
+- Autonomous movement of the detective between floors using an elevator
+- Interactive dialogue system showing the detective's interrogation process
+- Analysis and deduction visualization
+- Case conclusion with confidence measurements
+
+## Project Team
+
 - Mathieu Rio
 - Arthur Bourdin
 - Rémi Maigrot
 
-Les assets présents dans Content, hors Music, appartiennent à l'utilisateur Grainbox.
+## Assets
+
+The graphical assets in the Content folder (excluding music) were created by Grainbox:
 https://github.com/Grainbox
 
-## Structure de base
+## Project Structure
 
-### Main
+The project is organized into several key files:
 
-Le fichier `main.py` est divisé en deux parties :
-1. **L'initialisation** des composants nécessaires au jeu.
-2. **La boucle principale** qui gère l'affichage et la logique du jeu.
-
----
-
-### Initialisation
-
-```Python
-import pygame
-from src.assets import load_images, get_player, update_rect
-from src.tools import click_debug
-from src.movement import handle_movement, goto
+```
+├── main.py                  # Main entry point
+├── generate_and_play.py     # Case generation and visualization launcher
+├── detective_game.py        # Main game class and visualization
+├── case_processor.py        # Handles case data and investigation logic
+├── assets.py                # Manages game assets and sprites
+├── movement_system.py       # Handles character movement
+├── utils.py                 # Utility functions
+├── detective.py             # AI detective algorithm
+├── create_plot.py           # Mystery case generator
+├── content/                 # Game assets (images, sounds)
+└── case_history/            # Generated case files
 ```
 
-Tout d'abord, nous importons `pygame`, qui est le moteur de jeu utilisé, ainsi que les différentes fonctions définies dans d'autres fichiers. Ces fonctions sont réparties dans plusieurs fichiers situés dans le dossier `src`.
+## How to Run the Game
 
-```Python
-# Initialisation de Pygame
-pygame.init()
-pygame.mixer.init()
-screen = pygame.display.set_mode((600, 700))
-clock = pygame.time.Clock()
+### From Existing Case File
 
-pygame.mixer.music.load("./content/music.ogg")
-pygame.mixer.music.play(-1)
-images = load_images()
-player_key = get_player(images)
+To run the game with an existing case file:
+
+```bash
+python main.py
 ```
 
-- **Initialisation de Pygame** : `pygame.init()` initialise la bibliothèque Pygame.
-- **Initialisation du mixeur audio** : `pygame.mixer.init()` permet de gérer le son.
-- **Création de la fenêtre** : `pygame.display.set_mode((600, 700))` définit une fenêtre de 600x700 pixels.
-- **Initialisation de l'horloge** : `pygame.time.Clock()` permet de contrôler la fréquence d'affichage (ici, 10 FPS).
-- **Chargement et lecture de la musique** :
+Or specify a specific case file:
 
-  ```Python
-  pygame.mixer.music.load("./content/music.ogg")
-  pygame.mixer.music.play(-1)
-  ```
-  > L'argument `-1` indique que la musique doit être lue en boucle.
-
-Ensuite, nous chargeons toutes les images du jeu et récupérons la clé correspondant au joueur :
-
-```Python
-images = load_images()
-player_key = get_player(images)
+```bash
+python main.py path/to/case_file.json
 ```
 
----
+### Generate New Case and Play
 
-### Boucle principale
+To generate a new case and then optionally visualize it:
 
-```Python
-running = True
-while running:
-    screen.fill((30, 30, 30))
-
-    if player_key:
-        keys = pygame.key.get_pressed()
-        handle_movement(images[player_key], keys)
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        # click_debug(event)
-
-    for key, data in images.items():
-        screen.blit(data["image"], data["position"])
-        images = update_rect(images)
-
-    pygame.display.flip()
-    clock.tick(10)
-
-pygame.quit()
+```bash
+python generate_and_play.py
 ```
 
-La boucle principale s'exécute en continu tant que `running` est `True`.
+## Game Controls
 
-- **Définition de la couleur du fond** :
-  ```Python
-  screen.fill((30, 30, 30))
-  ```
-  Le fond est rempli avec une couleur gris foncé (RGB : 30, 30, 30).
+| Key       | Function                                      |
+|-----------|-----------------------------------------------|
+| SPACE     | Manual intervention (advance dialogue/deduction) |
+| F         | Toggle fast mode (speeds up simulation)       |
+| H         | Show/hide help screen                         |
+| ESC       | Exit the game                                 |
 
-- **Gestion du mouvement du joueur** :
-  ```Python
-  if player_key:
-      keys = pygame.key.get_pressed()
-      handle_movement(images[player_key], keys)
-  ```
-  Cette partie du code permet de récupérer les touches pressées et d'appliquer les déplacements du joueur à l'aide des fonctions du fichier `movement.py`.
+## Key Components
 
-- **Gestion des événements** :
-  ```Python
-  for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-          running = False
-      # click_debug(event)
-  ```
-  Ici, nous traitons les événements tels que les clics et les touches du clavier. Si l'utilisateur ferme la fenêtre (`pygame.QUIT`), la variable `running` passe à `False`, ce qui met fin à la boucle.
-  > La fonction `click_debug(event)` est utilisée pour afficher dans le terminal les coordonnées du clic de la souris (utile pour le débogage).
+### Detective Game Class
 
-- **Mise à jour et affichage des images** :
-  ```Python
-  for key, data in images.items():
-      screen.blit(data["image"], data["position"])
-      images = update_rect(images)
-  ```
-  Chaque image est redessinée à sa nouvelle position pour animer les déplacements.
+The `DetectiveGame` class is the core of the visualization system:
 
-- **Rafraîchissement de l'affichage** :
-  ```Python
-  pygame.display.flip()
-  clock.tick(10)
-  ```
-  `pygame.display.flip()` met à jour l'affichage, et `clock.tick(10)` limite la fréquence d'images à 10 FPS.
-
-Enfin, lorsque la boucle est terminée, le programme quitte proprement :
-```Python
-pygame.quit()
+```python
+class DetectiveGame:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((600, 700))
+        pygame.display.set_caption("Detective AI Investigation")
+        self.clock = pygame.time.Clock()
+        # ... initialization of game states and systems
+        
+    def run(self, json_data):
+        """Run game with specified case"""
+        self.load_case(json_data)
+        
+        while self.running:
+            self.handle_events()
+            self.update()
+            self.render()
+            self.clock.tick(60)
+        
+        pygame.quit()
+        return self.conclusion["correct"] if self.conclusion else False
 ```
 
+### Autonomous Detective Movement
 
-### Tools
+One of the key features is the detective's ability to move autonomously between floors to interrogate suspects:
 
-```Python
-import pygame
-
-def click_debug(event):
-    if event.type == pygame.MOUSEBUTTONDOWN:
-        x, y = event.pos
-        print(f"Clic détecté à : ({x}, {y}, : {y - 66})")
+```python
+def move_detective_autonomously(self):
+    """Move detective autonomously toward target"""
+    player = self.images[self.player_id]
+    
+    # Fix Y position if needed
+    expected_y = self.movement.floor_positions[player["floor"]]
+    if abs(player["position"][1] - expected_y) > 2:
+        player["position"] = (player["position"][0], expected_y)
+    
+    # Return to ground floor if no target or in deduction phase
+    if not self.target_npc or self.game_phase == "deduction":
+        if player["floor"] != 0:
+            # Move toward elevator
+            elevator_x = 265
+            if abs(player["position"][0] - elevator_x) > 5:
+                # ... movement logic ...
+            else:
+                # Go down one floor
+                if pygame.time.get_ticks() - getattr(self, "last_floor_change", 0) > 1000:
+                    self.movement.change_floor(player, -1)
+                    self.last_floor_change = pygame.time.get_ticks()
+        return
+    
+    # ... more movement logic ...
 ```
 
-### Assets
+### Case Processing
 
-```Python
-import pygame
+The `CaseProcessor` handles the interrogation sequence, extracting dialogues from the JSON data:
 
-def load_images():
-    path = "./content/"
-    image = {
-        "background": {
-            "image": pygame.image.load(path + "game-background.png"),
-            "position": (0, 0),
-            "size": (600, 700)
-        },
-        "firstPlayer": {
-            "image": pygame.image.load(path + "sprt_player.png"),
-            "_original": pygame.image.load(path + "sprt_player.png"),
-            "position": (300, 552),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "max-index": 7,
-            "player": True,
-            "floor": 0,
-            "target": None
-        },
-        "npc01": {
-            "image": pygame.image.load(path + "neighbor1.png"),
-            "_original": pygame.image.load(path + "neighbor1.png"),
-            "position": (160, 461),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "npc": True,
-            "floor": 1
-        },
-        "npc02": {
-            "image": pygame.image.load(path + "neighbor2.png"),
-            "_original": pygame.image.load(path + "neighbor2.png"),
-            "position": (421, 388),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "npc": True,
-            "floor": 2
-        },
-        "npc03": {
-            "image": pygame.image.load(path + "neighbor3.png"),
-            "_original": pygame.image.load(path + "neighbor3.png"),
-            "position": (75, 314),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "npc": True,
-            "floor": 3
-        },
-        "npc04": {
-            "image": pygame.image.load(path + "neighbor4.png"),
-            "_original": pygame.image.load(path + "neighbor4.png"),
-            "position": (160, 242),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "npc": True,
-            "floor": 4
-        },
-        "npc05": {
-            "image": pygame.image.load(path + "neighbor5.png"),
-            "_original": pygame.image.load(path + "neighbor5.png"),
-            "position": (421, 168),
-            "size": (175, 66),
-            "sprite": (25, 66),
-            "index": 3,
-            "default_index": 3,
-            "npc": True,
-            "floor": 5
-        }
-    }
-    resize(image)
-    return image
+```python
+def get_next_dialogue(self):
+    """Get next interrogation dialogue"""
+    if not self.interrogation_phase:
+        return None, None, None
+    
+    if self.current_suspect_idx >= len(self.suspects):
+        self.interrogation_phase = False
+        self.deduction_phase = True
+        return None, None, None
+    
+    suspect = self.suspects[self.current_suspect_idx]
+    suspect_name = suspect["name"]
+    interrogation = self.case_data["case"]["statements"].get(suspect_name, {})
+    
+    # ... dialogue extraction logic ...
+    
+    return npc_id, current_question, current_answer
+```
 
-def resize(images):
-    for key in images:
-        img_data = images[key]
-        target_width, target_height = img_data["size"]
-        images[key]["image"] = pygame.transform.scale(img_data["image"], (target_width, target_height))
+### Game Phases
 
-def extract_sprites(images):
-    for key in images:
-        img_data = images[key]
-        if "sprite" in img_data:  # Vérifie si c'est une sprite sheet
-            sprite_width, sprite_height = img_data["sprite"]
-            sprite_index = img_data.get("index", 0)  # Par défaut, prend le sprite 0
+The game progresses through three main phases:
 
-            # Définir le rectangle du sprite à extraire
-            sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
+1. **Exploration Phase**: The detective moves between floors to interrogate suspects
+2. **Deduction Phase**: The detective returns to the ground floor and presents deductions
+3. **Conclusion Phase**: The detective announces the culprit and the confidence level
 
-            # Extraire et remplacer l'image originale par le sprite extrait
-            images[key]["image"] = images[key]["image"].subsurface(sprite_rect)
+```python
+def set_next_target(self):
+    """Set the next NPC to interrogate"""
+    npc_id, question, answer = self.case_processor.get_next_dialogue()
+    
+    if npc_id:
+        # ... interrogation setup ...
+    elif self.game_phase == "exploration":
+        # Move to deduction phase
+        self.game_phase = "deduction"
+        self.images[self.player_id]["floor"] = 0
+        
+        # Get all deductions
+        # ...
+    elif self.game_phase == "deduction" and self.current_deduction >= len(self.deductions):
+        # Move to conclusion phase
+        self.game_phase = "conclusion"
+        self.conclusion = self.case_processor.get_conclusion()
+```
 
+### Elevator System
+
+The movement system handles the detective's ability to change floors using the elevator:
+
+```python
+def change_floor(self, entity, direction):
+    new_floor = entity["floor"] + direction
+    if 0 <= new_floor < len(self.floor_positions):
+        entity["floor"] = new_floor
+        entity["position"] = (entity["position"][0], self.floor_positions[entity["floor"]])
+        if self.elevator_sound:
+            self.elevator_sound.play()
+```
+
+### NPC Behavior
+
+NPCs move naturally on their floor, with their behavior affected by their guilt level:
+
+```python
+def update_npc_behavior(self, npc):
+    """Update NPC behavior"""
+    # ... state management ...
+    
+    if npc["state"] == "walking":
+        # Move toward target
+        if npc["target_pos"]:
+            # ... movement calculations ...
+            
+            # Guilt affects speed and movement
+            speed_factor = 0.8 + (npc.get("guilt", 0.1) * 0.5)
+            jitter = npc.get("guilt", 0.1) * 2.0
+            
+            # Add random movement for stressed NPCs
+            dx += random.uniform(-jitter, jitter)
+            dy += random.uniform(-jitter, jitter)
+            
+            # ... more movement code ...
+```
+
+### Dialogue System
+
+The game features an automatic dialogue system that displays the detective's interrogation process:
+
+```python
+def render_dialogue(self):
+    # Dialogue panel
+    pygame.draw.rect(self.screen, (40, 40, 40, 200), (50, 450, 500, 180))
+    pygame.draw.rect(self.screen, (200, 200, 200), (50, 450, 500, 180), 2)
+    
+    # Display current dialogue
+    if 0 <= self.dialogue_progress < len(self.current_dialogue):
+        current_text = self.current_dialogue[self.dialogue_progress]
+        
+        # Split speaker and text
+        parts = current_text.split(": ", 1)
+        if len(parts) >= 2:
+            speaker, text = parts
+            # Speaker name in color
+            draw_text(self.screen, speaker + ":", (70, 470), color=(255, 255, 0))
+            
+            # Text with line wrapping
+            # ... text wrapping logic ...
+```
+
+### Case Generation
+
+The system includes a case generator that creates unique mysteries:
+
+```python
+def main():
+    # Generate a new mystery case
+    print("Generating mystery case...")
+    case_data = create_plot.generate_case()
+    
+    # ... display case info ...
+    
+    # Run the detective's investigation
+    print("\nBeginning investigation...")
+    culprit, reasoning = detective.investigate(case_data)
+    
+    # ... save case and visualize if requested ...
+```
+
+## Floor System
+
+The game uses a multi-floor building structure:
+
+- **Ground Floor (Floor 0)**: Y-position 552, starting point for the detective
+- **1st Floor (Floor 1)**: Y-position 461
+- **2nd Floor (Floor 2)**: Y-position 387
+- **3rd Floor (Floor 3)**: Y-position 314
+- **4th Floor (Floor 4)**: Y-position 241
+- **5th Floor (Floor 5)**: Y-position 168
+
+Each floor can have NPCs (suspects) that the detective needs to interrogate.
+
+## Fast Mode
+
+The game includes a fast mode (toggled with F key) that speeds up:
+- Dialogue progression
+- Detective movement 
+- Deduction presentation
+
+This is useful for quickly viewing the entire investigation process.
+
+## Assets Management
+
+The game manages sprite animations and character appearances:
+
+```python
 def update_rect(images):
-    """Met à jour les rect des images en fonction de l'index du sprite."""
-    for key, img_data in images.items():
-        if "sprite" in img_data:  # Vérifie si c'est une sprite sheet
-            sprite_width, sprite_height = img_data["sprite"]
-            target_width, target_height = img_data["size"]
-            sprite_index = img_data["index"]
-            sprite_rect = pygame.Rect(sprite_index * sprite_width, 0, sprite_width, sprite_height)
-            tmp = img_data["_original"]
-            tmp = pygame.transform.scale(tmp, (target_width, target_height))
-            images[key]["image"] = tmp.subsurface(sprite_rect)
-    return images  # Retourne le dictionnaire mis à jour
-
-def get_player(images):
-    for key, img_data in images.items():
-        if img_data.get("player", False):  # Vérifie si l'entrée a la clé "player" à True
-            return key  # Retourne le nom de l'objet joueur
-        print(key)
-    return None
+    for key in images:
+        img_data = images[key]
+        if "sprite" in img_data:
+            sprite_w, sprite_h = img_data["sprite"]
+            index = img_data["index"]
+            
+            original = img_data["_original"]
+            sprite_rect = pygame.Rect(
+                index * sprite_w,
+                0,
+                sprite_w,
+                sprite_h
+            )
+            img_data["image"] = original.subsurface(sprite_rect)
+            # Update collision rect
+            img_data["rect"] = pygame.Rect(
+                img_data["position"][0], 
+                img_data["position"][1],
+                50,  # Collision width
+                66   # Collision height
+            )
+    return images
 ```
 
-### Movement
+## Technical Implementation
 
-```Python
-import pygame
+The game combines traditional game development with AI algorithms:
 
-elevator = (243, 287)
-floor = [552, 461, 387, 314, 241, 166]
-border = (50, 530)
-couldown = 0
+1. **Pygame**: Used for rendering, input handling, and game loop
+2. **AI Detective Algorithm**: Analyzes statements, finds contradictions, and makes deductions
+3. **JSON Case Format**: Standardized format for case information and detective reasoning
+4. **Autonomous Movement System**: Handles pathfinding and character animation
+5. **State Machine**: Manages game phases and transitions
 
-pygame.mixer.init()
-sound = pygame.mixer.Sound("./content/ascenseur.wav")
+## Development Notes
 
-def handle_movement(player, keys):
-    i = 0
-    if keys:
-        i += move_left(player, keys, border)
-        i += move_right(player, keys, border)
-        i += move_up_elevator(player, keys, elevator, floor)
-        i += move_down_elevator(player, keys, elevator, floor)
+The detective AI makes decisions based on:
+- Contradictions between suspect statements
+- Suspicious behavior during interrogation
+- Evidence found at the crime scene
+- Relationships between suspects and the victim
 
-    if i == 0:
-        reset_rect(player)
+The visualization system faithfully represents the detective's thought process and movement throughout the building as it conducts its investigation.
 
-def move_left(player, keys, border):
-    if keys == "left" or keys[pygame.K_LEFT]:
-        pos = list(player["position"])
-        left, _ = border
-        if pos[0] > left:
-            pos[0] -= 10
-        player["position"] = tuple(pos)
+## Future Improvements
 
-        if (player["index"] > 3 or player["index"] == 0):
-            player["index"] = 2
-        else:
-            player["index"] = player["index"] - 1
-        return 1
-    return 0
-
-def move_right(player, keys, border):
-    if keys == "right" or keys[pygame.K_RIGHT]:
-        pos = list(player["position"])
-        _, right = border
-        if pos[0] < right:
-            pos[0] += 10
-        player["position"] = tuple(pos)
-
-        if (player["index"] < 3 or player["index"] == 6):
-            player["index"] = 4
-        else:
-            player["index"] = player["index"] + 1
-        return 1
-    return 0
-
-def move_up_elevator(player, keys, elevator, floor):
-    if keys == "up" or keys[pygame.K_UP]:
-        pos = list(player["position"])
-        left, right = elevator
-        if pos[0] > left and pos[0] < right:
-            if player["floor"] < len(floor) - 1:
-                player["floor"] += 1
-                pos[1] = floor[player["floor"]]
-                player["position"] = tuple(pos)
-                sound.play()
-                return 1
-    return 0
-
-def move_down_elevator(player, keys, elevator, floor):
-    if keys == "down" or keys[pygame.K_DOWN]:
-        pos = list(player["position"])
-        left, right = elevator
-        if pos[0] > left and pos[0] < right:
-            if player["floor"] > 0:
-                player["floor"] -= 1
-                pos[1] = floor[player["floor"]]
-                player["position"] = tuple(pos)
-                sound.play()
-                return 1
-    return 0
-
-def reset_rect(player):
-    player["index"] = player["default_index"]
-
-def goto(player, target):
-    ecart = 35
-    elevator_left = 243
-    elevator_right = 287
-    x, _ = player["position"]
-    x_npc, _ = target["position"]
-
-    if target == None:
-        return 0
-
-    # si la target est à un autre etage
-    if player["floor"] != target["floor"]:
-        # ce rendre à l'ascenceur
-            if x < elevator_left:
-                # print("mov to right")
-                move_right(player, "right", border)
-                return 0
-            if x > elevator_right:
-                # print("mov to left")
-                move_left(player, "left", border)
-                return 0
-        # monter à l'étage
-            if player["floor"] < target["floor"]:
-                # print("mov to up")
-                move_up_elevator(player, "up", elevator, floor)
-                return 0
-            if player["floor"] > target["floor"]:
-                # print("mov to down")
-                move_down_elevator(player, "down", elevator, floor)
-                return 0
-    # avancer vers la target
-    if x < (x_npc - ecart):
-        move_right(player, "right", border)
-        return 0
-    if x > (x_npc + ecart):
-        move_left(player, "left", border)
-        return 0
-    return 1
-```
+Potential future improvements include:
+- More complex case generation with multiple crimes
+- Additional interrogation techniques
+- Improved NPC behavior with more complex movement patterns
+- Additional visual effects and animations
+- Sound effects for different actions
