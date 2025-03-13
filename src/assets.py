@@ -121,7 +121,7 @@ def load_images():
         }
     }
 
-    # Post-traitement des images
+    # Post-process images
     resize(images)
     update_rect(images)
     return images
@@ -150,12 +150,12 @@ def update_rect(images):
                 sprite_h
             )
             img_data["image"] = original.subsurface(sprite_rect)
-            # Mettre à jour le rect de collision
+            # Update collision rect
             img_data["rect"] = pygame.Rect(
                 img_data["position"][0], 
                 img_data["position"][1],
-                50,  # Largeur collision
-                66   # Hauteur collision
+                50,  # Collision width
+                66   # Collision height
             )
     return images
 
