@@ -80,8 +80,8 @@ class SimpleNLP:
         
         return list(set(entities))
     
-    def find_contradictions(self, statements):
-        """Find contradictions between different statements"""
+    def find_contradictions(self, statements, interrogation_log=None):
+        """Find contradictions between different statements with improved detection"""
         contradictions = []
         
         # Extract time and location information from each statement
@@ -109,7 +109,7 @@ class SimpleNLP:
                     "location": observation["location"]
                 })
         
-        # Check for direct contradictions
+        # Check for contradictions in alibis
         for person, locations in person_locations.items():
             if not locations["self_reported"]:
                 continue
@@ -130,6 +130,69 @@ class SimpleNLP:
                         "reporter": observer,
                         "details": f"{person} claims to be at {self_location} during {self_time}, but {observer} says they were at {obs_location}"
                     })
+        
+        # Check for contradictions in observations
+        # This looks for cases where two people claim to have seen a third person at different places at the same time
+        for person in person_locations:
+            observers = defaultdict(list)  # Time -> list of (observer, location)
+            
+            # Collect all observations for this person
+            for other_person, statement in statements.items():
+                if person in statement["saw_other_suspects"]:
+                    obs = statement["saw_other_suspects"][person]
+                    observers[obs["time"]].append((other_person, obs["location"]))
+            
+            # Check if anyone reported conflicting locations for the same time
+            for time, observations in observers.items():
+                if len(observations) >= 2:
+                    # Check for contradictions
+                    locations = [obs[1] for obs in observations]
+                    if len(set(locations)) > 1:  # Different locations reported
+                        details = f"Conflicting reports for {person} at {time}: "
+                        for observer, location in observations:
+                            details += f"{observer} saw them at {location}; "
+                        
+                        contradictions.append({
+                            "type": "multiple_witness_contradiction",
+                            "subject": person,
+                            "time": time,
+                            "details": details.strip("; ")
+                        })
+        
+        # Check for contradictions with crime scene evidence
+        if interrogation_log:
+            for person, log in interrogation_log.items():
+                for i, question in enumerate(log["questions"]):
+                    if i < len(log["answers"]) and "evidence" in question.lower():
+                        # Check if they denied knowledge but someone else saw them with the evidence
+                        answer = log["answers"][i]
+                        if "no" in answer.lower() or "don't know" in answer.lower() or "haven't seen" in answer.lower():
+                            evidence_item = question.split("about a ")[1].split(" related")[0] if "about a " in question else ""
+                            
+                            # Check if someone else saw them with this evidence
+                            for other_person, other_statement in statements.items():
+                                if other_person == person:
+                                    continue
+                                    
+                                for obs in other_statement["heard_or_saw"]:
+                                    if evidence_item.lower() in obs["details"].lower() and person.lower() in obs["details"].lower():
+                                        contradictions.append({
+                                            "type": "evidence_contradiction",
+                                            "subject": person,
+                                            "reporter": other_person,
+                                            "details": f"{person} denied knowledge of the {evidence_item}, but {other_person} {obs['type']} them with it: {obs['details']}"
+                                        })
+        
+        # Also include observations from interrogations that were marked as contradictions
+        if interrogation_log:
+            for person, log in interrogation_log.items():
+                for observation in log["observations"]:
+                    if "contradiction" in observation.lower():
+                        contradictions.append({
+                            "type": "interrogation_contradiction",
+                            "subject": person,
+                            "details": observation
+                        })
         
         return contradictions
     
@@ -262,7 +325,7 @@ class DetectiveAgent:
         self.deduction_log.append(f"Evidence found: {', '.join(crime['evidence'])}")
     
     def _interrogate_suspect(self, suspect):
-        """Conduct an interrogation with a suspect"""
+        """Conduct an enhanced interrogation with a suspect"""
         suspect_name = suspect["name"]
         statement = self.current_case["statements"][suspect_name]
         dialogue_style = self.current_case["dialogue_styles"][suspect_name]
@@ -275,30 +338,31 @@ class DetectiveAgent:
             "key_facts": []
         }
         
-        # First question - basic alibi
+        # Première phase: questions de base
+        # 1. Question sur l'alibi
         self._ask_question(suspect_name, "Where were you at the time of the incident?")
         self._record_answer(suspect_name, 
                            f"I was at {statement['alibi_location']} during {statement['alibi_time']}." + 
                            (f" {statement['alibi_witness']} can confirm this." if statement['alibi_witness'] else ""))
         
-        # Record observation about their demeanor
+        # Enregistrer l'observation sur leur comportement
         if "nervous" in suspect["personality"]:
             self._record_observation(suspect_name, "Suspect appears nervous during questioning")
         elif "confident" in suspect["personality"]:
             self._record_observation(suspect_name, "Suspect appears very confident and composed")
         
-        # Ask about the victim
+        # 2. Question sur la relation avec la victime
         self._ask_question(suspect_name, "What was your relationship with the victim?")
         
         victim_response = f"My relationship with the victim was {statement['attitude_to_victim']}."
         if statement["knew_victim"]:
-            victim_response += " I knew them as " + suspect["relationship_to_victim"] + "."
+            victim_response += f" I knew them as {suspect['relationship_to_victim']}."
         else:
             victim_response += " I barely knew them."
         
         self._record_answer(suspect_name, victim_response)
         
-        # Ask about other suspects they might have seen
+        # 3. Questions générales sur les autres suspects
         if statement["saw_other_suspects"]:
             other_names = list(statement["saw_other_suspects"].keys())
             self._ask_question(suspect_name, f"Did you see any of the other suspects around the time of the incident?")
@@ -313,7 +377,7 @@ class DetectiveAgent:
             self._ask_question(suspect_name, "Did you see anyone suspicious around the time of the incident?")
             self._record_answer(suspect_name, "No, I didn't see anyone suspicious.")
         
-        # Ask about what they heard or saw
+        # 4. Questions sur ce qu'ils ont vu ou entendu
         if statement["heard_or_saw"]:
             self._ask_question(suspect_name, "Did you notice anything unusual that day?")
             
@@ -323,7 +387,111 @@ class DetectiveAgent:
             
             self._record_answer(suspect_name, answer)
         
-        # Extract key facts from their statements
+        # Deuxième phase: questions plus ciblées sur les autres suspects
+        # Si nous avons déjà interrogé d'autres suspects, posons des questions sur leurs alibis
+        for other_suspect in self.current_case["suspects"]:
+            other_name = other_suspect["name"]
+            
+            # Ne pas poser de questions sur eux-mêmes
+            if other_name == suspect_name:
+                continue
+                
+            # Vérifier si nous avons déjà interrogé cet autre suspect
+            if other_name in self.interrogation_log:
+                other_statement = self.current_case["statements"][other_name]
+                
+                # Question spécifique sur l'alibi de l'autre suspect
+                self._ask_question(suspect_name, 
+                                  f"Did you happen to see {other_name} at {other_statement['alibi_location']} during {other_statement['alibi_time']}?")
+                
+                # Génération de la réponse en fonction de ce qu'ils ont déclaré voir
+                if other_name in statement["saw_other_suspects"]:
+                    obs = statement["saw_other_suspects"][other_name]
+                    if obs["time"] == other_statement["alibi_time"] and obs["location"] == other_statement["alibi_location"]:
+                        answer = f"Yes, I did see {other_name} there at that time."
+                    else:
+                        answer = f"No, I didn't see {other_name} there. "
+                        answer += f"I saw them at {obs['location']} during {obs['time']} instead."
+                        
+                        # Marquer cette incohérence dans le journal d'observation
+                        self._record_observation(suspect_name, 
+                                               f"Contradicts {other_name}'s alibi claiming to be at {other_statement['alibi_location']} during {other_statement['alibi_time']}")
+                else:
+                    # Générer aléatoirement une réponse s'ils n'ont pas mentionné cette personne avant
+                    if random.random() < 0.3:  # 30% de chance de créer un nouveau témoignage
+                        saw_location = other_statement["alibi_location"] if random.random() < 0.7 else random.choice(
+                            [loc for loc in self.current_case["crime"]["location"] if loc != other_statement["alibi_location"]])
+                        
+                        answer = f"Actually, now that you mention it, I think I did see {other_name} at {saw_location} around that time."
+                        
+                        # Ajouter cette nouvelle observation à leur déclaration
+                        statement["saw_other_suspects"][other_name] = {
+                            "time": other_statement["alibi_time"],
+                            "location": saw_location,
+                            "details": f"Just briefly saw them there."
+                        }
+                        
+                        # Vérifier s'il y a une contradiction
+                        if saw_location != other_statement["alibi_location"]:
+                            self._record_observation(suspect_name, 
+                                                   f"New contradiction: claims to have seen {other_name} at {saw_location}, not at their claimed alibi location {other_statement['alibi_location']}")
+                    else:
+                        answer = f"No, I don't recall seeing {other_name} there at that time."
+                
+                self._record_answer(suspect_name, answer)
+        
+        # Troisième phase: questions sur des éléments spécifiques de la scène de crime
+        # Question sur des preuves spécifiques
+        for evidence in self.current_case["crime"]["evidence"]:
+            self._ask_question(suspect_name, f"Do you know anything about a {evidence} related to this case?")
+            
+            # Vérifier si l'une de leurs observations mentionne cette preuve
+            evidence_mentioned = False
+            for obs in statement["heard_or_saw"]:
+                if evidence.lower() in obs["details"].lower():
+                    self._record_answer(suspect_name, f"Yes, I {obs['type']} {obs['details']}.")
+                    evidence_mentioned = True
+                    break
+            
+            if not evidence_mentioned:
+                # S'ils sont le coupable, ils pourraient être nerveux en parlant de preuves
+                if suspect_name == self.current_case["culprit"]["name"] and random.random() < 0.7:
+                    self._record_answer(suspect_name, f"No, I know nothing about any {evidence}.")
+                    self._record_observation(suspect_name, f"Seemed uncomfortable when asked about the {evidence}")
+                else:
+                    self._record_answer(suspect_name, f"No, I haven't seen or heard anything about a {evidence}.")
+        
+        # Question finale sur leur théorie du crime
+        self._ask_question(suspect_name, "Do you have any theory about who might be responsible for this incident?")
+        
+        # Si c'est le coupable, ils accuseront quelqu'un d'autre
+        if suspect_name == self.current_case["culprit"]["name"]:
+            other_suspects = [s["name"] for s in self.current_case["suspects"] if s["name"] != suspect_name]
+            accused = random.choice(other_suspects) if other_suspects else "someone else"
+            
+            theory = f"I think {accused} might be involved. "
+            # Ajouter une fausse raison
+            theories = [
+                f"They seemed very suspicious that day.",
+                f"I heard they had a grudge against the victim.",
+                f"They were seen near the crime scene.",
+                f"Someone told me they've been acting strange lately."
+            ]
+            theory += random.choice(theories)
+            
+            self._record_answer(suspect_name, theory)
+            self._record_observation(suspect_name, "Quickly deflected blame to another person")
+        else:
+            # S'ils ne sont pas coupables, réponses variées
+            theories = [
+                "I really don't know who could have done this.",
+                "I have no idea, everyone seemed normal to me that day.",
+                "I'm not sure, but something strange was definitely going on.",
+                "I'd rather not speculate without evidence."
+            ]
+            self._record_answer(suspect_name, random.choice(theories))
+        
+        # Extraire les faits clés de leurs déclarations
         key_facts = self.nlp.extract_key_facts(statement)
         for fact in key_facts:
             self.interrogation_log[suspect_name]["key_facts"].append(fact)
@@ -352,7 +520,7 @@ class DetectiveAgent:
     def _analyze_statements(self):
         """Analyze all statements for contradictions and inconsistencies"""
         print("\nAnalyzing statements for contradictions...")
-        contradictions = self.nlp.find_contradictions(self.current_case["statements"])
+        contradictions = self.nlp.find_contradictions(self.current_case["statements"], self.interrogation_log)
         
         # Log all contradictions found
         for c in contradictions:
@@ -362,40 +530,120 @@ class DetectiveAgent:
         return contradictions
     
     def _calculate_suspicion(self):
-        """Calculate suspicion scores for each suspect"""
+        """Calculate improved suspicion scores for each suspect"""
         print("\nCalculating suspicion scores...")
         
-        contradictions = self.nlp.find_contradictions(self.current_case["statements"])
+        contradictions = self.nlp.find_contradictions(self.current_case["statements"], self.interrogation_log)
         
         for suspect in self.current_case["suspects"]:
             name = suspect["name"]
-            score = self.nlp.calculate_suspicion_score(name, self.current_case, contradictions)
+            score = 0  # Commencer à zéro et accumuler des preuves
             
-            # Additional factors:
-            # 1. Suspicious behavior during interrogation
-            for observation in self.interrogation_log[name]["observations"]:
-                if "nervous" in observation.lower() or "suspicious" in observation.lower():
-                    score += 1
-                if "confident" in observation.lower() and "too confident" not in observation.lower():
-                    score -= 0.5
+            # 1. Nombre de contradictions directes
+            suspect_contradictions = [c for c in contradictions if c["subject"] == name]
+            contradiction_count = len(suspect_contradictions)
+            score += contradiction_count * 2  # Chaque contradiction compte double
             
-            # 2. Relationship with victim
+            if contradiction_count > 0:
+                self.deduction_log.append(f"{name} has {contradiction_count} contradictions in their statements")
+                print(f"  - {name} has {contradiction_count} contradictions")
+            
+            # 2. Facteurs liés à l'alibi
             statement = self.current_case["statements"][name]
+            
+            # Absence de témoin pour l'alibi
+            if not statement["alibi_witness"]:
+                score += 1.5
+                self.deduction_log.append(f"{name} has no alibi witness")
+            
+            # Proximité avec le lieu du crime
+            # Plus de points si l'alibi est près du lieu du crime ou à l'heure du crime
+            if statement["alibi_location"] == self.current_case["crime"]["location"]:
+                score += 2
+                self.deduction_log.append(f"{name} was near the crime scene")
+            
+            if statement["alibi_time"] == self.current_case["crime"]["time"]:
+                score += 1.5
+                self.deduction_log.append(f"{name} was present during the time of the crime")
+            
+            # 3. Comportement suspect pendant l'interrogatoire
+            suspicious_behavior = False
+            defensive_behavior = False
+            
+            for observation in self.interrogation_log[name]["observations"]:
+                if any(word in observation.lower() for word in ["nervous", "uncomfortable", "hesitant", "suspicious"]):
+                    suspicious_behavior = True
+                    score += 1.5
+                
+                if any(word in observation.lower() for word in ["deflected", "blame", "accuse", "defensive"]):
+                    defensive_behavior = True
+                    score += 1.2
+            
+            if suspicious_behavior:
+                self.deduction_log.append(f"{name} showed suspicious behavior during questioning")
+            
+            if defensive_behavior:
+                self.deduction_log.append(f"{name} was defensive or deflected blame")
+            
+            # 4. Relation avec la victime
             if statement["attitude_to_victim"] == "negative":
-                score += 1
-            elif statement["attitude_to_victim"] == "positive":
-                score -= 0.5
+                score += 1.5
+                self.deduction_log.append(f"{name} had a negative relationship with the victim")
+            elif statement["attitude_to_victim"] == "neutral" and statement["knew_victim"]:
+                # Parfois les coupables prétendent être neutres pour cacher leurs sentiments
+                score += 0.5
             
-            # 3. Consistency with evidence found
-            for observation in statement["heard_or_saw"]:
-                for evidence in self.current_case["crime"]["evidence"]:
-                    if evidence.lower() in observation["details"].lower():
-                        score += 0.5
+            # 5. Accusations des autres
+            accused_by_others = 0
+            for other_suspect in self.current_case["suspects"]:
+                other_name = other_suspect["name"]
+                if other_name == name:
+                    continue
+                    
+                # Vérifier si d'autres personnes ont accusé ce suspect
+                if other_name in self.interrogation_log:
+                    for i, question in enumerate(self.interrogation_log[other_name]["questions"]):
+                        if "theory" in question.lower() and i < len(self.interrogation_log[other_name]["answers"]):
+                            answer = self.interrogation_log[other_name]["answers"][i]
+                            if name in answer:
+                                accused_by_others += 1
+                                self.deduction_log.append(f"{name} was accused by {other_name}")
             
-            # Store the final suspicion score
+            score += accused_by_others * 0.7  # Chaque accusation ajoute des points
+            
+            # 6. Connaissances spécifiques sur les preuves
+            knows_evidence = False
+            for i, question in enumerate(self.interrogation_log[name]["questions"]):
+                if "evidence" in question.lower() and i < len(self.interrogation_log[name]["answers"]):
+                    answer = self.interrogation_log[name]["answers"][i]
+                    if "yes" in answer.lower() and any(evidence.lower() in answer.lower() for evidence in self.current_case["crime"]["evidence"]):
+                        knows_evidence = True
+                        # C'est suspect s'ils connaissent trop de détails sur les preuves
+                        score += 0.8
+                        self.deduction_log.append(f"{name} had specific knowledge about evidence")
+            
+            # 7. Appliquer l'apprentissage des cas précédents
+            history_score = 0
+            for past_case in self.nlp.case_history:
+                if "correct" in past_case and past_case["correct"]:  # Seulement apprendre des cas correctement résolus
+                    culprit = past_case["case"]["culprit"]["name"]
+                    culprit_statement = past_case["case"]["statements"][culprit]
+                    suspect_statement = self.current_case["statements"][name]
+                    
+                    # Vérifier des modèles d'alibi similaires
+                    if not culprit_statement["alibi_witness"] and not suspect_statement["alibi_witness"]:
+                        history_score += 0.3
+                    
+                    # Vérifier des modèles de comportement similaires
+                    if culprit_statement["attitude_to_victim"] == suspect_statement["attitude_to_victim"]:
+                        history_score += 0.2
+            
+            score += history_score
+            
+            # Enregistrer le score final de suspicion
             self.suspicion_scores[name] = score
             print(f"  - {name}: {score:.2f}")
-            self.deduction_log.append(f"Suspicion score for {name}: {score:.2f}")
+            self.deduction_log.append(f"Final suspicion score for {name}: {score:.2f}")
     
     def _make_deduction(self):
         """Make a final deduction about who the culprit is"""
@@ -418,7 +666,7 @@ class DetectiveAgent:
         reasons = []
         
         # 1. Contradictions
-        contradictions = self.nlp.find_contradictions(self.current_case["statements"])
+        contradictions = self.nlp.find_contradictions(self.current_case["statements"], self.interrogation_log)
         culprit_contradictions = [c for c in contradictions if c["subject"] == culprit_name]
         if culprit_contradictions:
             reason = f"{culprit_name}'s statement contradicts others: "
@@ -438,6 +686,20 @@ class DetectiveAgent:
             if "nervous" in observation.lower() or "suspicious" in observation.lower():
                 reasons.append(f"{culprit_name} showed suspicious behavior: {observation}")
                 break
+        
+        # 4. Accusation patterns
+        if self.suspicion_scores[culprit_name] > 5 and any("deflected blame" in obs for obs in self.interrogation_log[culprit_name]["observations"]):
+            reasons.append(f"{culprit_name} deflected blame to others, a common tactic of the guilty")
+        
+        # 5. Evidence knowledge
+        evidence_knowledge = False
+        for i, question in enumerate(self.interrogation_log[culprit_name]["questions"]):
+            if "evidence" in question.lower() and i < len(self.interrogation_log[culprit_name]["answers"]):
+                answer = self.interrogation_log[culprit_name]["answers"][i]
+                if "yes" in answer.lower() and any(ev.lower() in answer.lower() for ev in self.current_case["crime"]["evidence"]):
+                    evidence_knowledge = True
+                    reasons.append(f"{culprit_name} had suspicious knowledge about crime scene evidence")
+                    break
         
         # Log the reasoning
         self.deduction_log.append(f"Deduction: {culprit_name} is the culprit (confidence: {confidence:.2f})")
