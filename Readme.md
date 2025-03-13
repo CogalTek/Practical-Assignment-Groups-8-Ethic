@@ -65,6 +65,43 @@ This project is an interactive detective game that uses AI to investigate cases 
                   └─────────────┘
 ```
 
+## Project File Structure
+
+```
+Practical-Assignment-Groups-8-Ethic/
+├── case_history/                 # Stores generated case files
+│   ├── case_1222.json
+│   ├── case_1570.json
+│   ├── case_4890.json
+│   ├── case_7148.json
+│   └── case_8256.json
+│
+├── content/                      # Game assets and resources
+│   ├── ascenseur.wav             # Elevator sound effect
+│   ├── game-background.png       # Main background image
+│   ├── music.ogg                 # Background music
+│   ├── sprt_player.png           # Detective sprite sheet
+│   ├── neighbor1.png             # NPC sprites
+│   ├── neighbor2.png
+│   ├── neighbor3.png
+│   ├── neighbor4.png
+│   ├── neighbor5.png
+│   └── ... (other UI and game assets)
+│
+├── src/                          # Source code
+│   ├── assets.py                 # Asset loading and management
+│   ├── case_processor.py         # Processes case data for visualization
+│   ├── create_plot.py            # Mystery case generator
+│   ├── detective.py              # AI detective algorithm
+│   ├── detective_game.py         # Main game visualization
+│   ├── movement_system.py        # Character movement and animations
+│   ├── setup.py                  # Setup utilities
+│   └── utils.py                  # General utility functions
+│
+├── main.py                       # Entry point for the game
+└── README.md                     # Project documentation
+```
+
 ## How to Run the Game
 
 ### From Existing Case File
