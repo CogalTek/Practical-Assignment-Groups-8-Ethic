@@ -4,7 +4,7 @@
 
 This project is an interactive detective game that uses AI to investigate cases autonomously. The detective analyzes evidence, interrogates suspects, and makes deductions to solve mysteries. The game features:
 
-- Procedural generation of mystery cases with different crimes, suspects, and motives
+- Procedural generation of mystery cases with different types of crimes, locations, and motives
 - AI detective that interrogates suspects and analyzes contradictions
 - Visual representation of the investigation process in a building with multiple floors
 - Autonomous movement of the detective between floors using an elevator
@@ -73,6 +73,280 @@ python generate_and_play.py
 | F         | Toggle fast mode (speeds up simulation)       |
 | H         | Show/hide help screen                         |
 | ESC       | Exit the game                                 |
+
+## AI Detective System
+
+### Overview of the AI Approach
+
+The detective in this game uses a hybrid AI system combining rule-based reasoning with statistical analysis and behavioral detection. The system is designed to mimic the deductive reasoning of a human detective by analyzing statements, identifying contradictions, evaluating suspect behavior, and weighing evidence.
+
+### Key AI Components
+
+1. **Rule-Based Reasoning**
+   
+   The core of the detective AI uses rule-based reasoning to identify contradictions and inconsistencies in suspect statements:
+
+   ```python
+   def find_contradictions(statements):
+       contradictions = []
+       # Check alibis against each other
+       for name1, statement1 in statements.items():
+           for name2, statement2 in statements.items():
+               if name1 != name2:
+                   # Check if one suspect claims to have seen another at a time/place 
+                   # that contradicts their alibi
+                   if name2 in statement1.get('saw_other_suspects', {}):
+                       sighting = statement1['saw_other_suspects'][name2]
+                       if sighting['time'] == statement2['alibi_time'] and \
+                          sighting['location'] != statement2['alibi_location']:
+                           contradictions.append({
+                               'type': 'alibi_contradiction',
+                               'details': f"{name1} saw {name2} at {sighting['location']} during {sighting['time']}, " \
+                                         f"but {name2} claims to be at {statement2['alibi_location']}"
+                           })
+       return contradictions
+   ```
+
+2. **Suspicion Scoring System**
+   
+   The AI assigns suspicion scores to each suspect based on various factors:
+
+   ```python
+   def calculate_suspicion(suspect, statements, contradictions, evidence):
+       score = 0.0
+       
+       # Contradictions increase suspicion
+       for contradiction in contradictions:
+           if suspect['name'] in contradiction['details']:
+               score += 1.5
+       
+       # Suspicious behavior during interrogation
+       if 'nervous' in suspect.get('personality', []):
+           score += 0.8
+       if 'deceptive' in suspect.get('personality', []):
+           score += 1.2
+           
+       # Motive increases suspicion
+       if 'motive' in suspect:
+           score += 1.0
+           
+       # Connection to evidence
+       for item in evidence:
+           if item in statements[suspect['name']].get('mentioned_items', []):
+               score += 0.7
+               
+       return score
+   ```
+
+3. **Behavioral Analysis**
+   
+   The AI analyzes suspect behavior during interrogation, looking for signs of nervousness, deception, or evasiveness:
+
+   ```python
+   def analyze_behavior(responses, personality):
+       behavior_score = 0.0
+       
+       # Check for hesitation patterns
+       hesitation_words = ['um', 'uh', 'well', 'actually', 'you see', 'I think']
+       for response in responses:
+           for word in hesitation_words:
+               if word in response.lower():
+                   behavior_score += 0.2
+       
+       # Check for question evasion
+       direct_questions = [q for q in questions if '?' in q]
+       direct_answers = [len(r.split()) > 3 for r in responses[:len(direct_questions)]]
+       evasion_rate = 1 - (sum(direct_answers) / len(direct_questions))
+       behavior_score += evasion_rate * 1.5
+       
+       # Adjust based on known personality
+       if 'nervous' in personality and behavior_score > 1.0:
+           behavior_score *= 0.7  # Nervous people may show signs without being guilty
+       
+       return behavior_score
+   ```
+
+4. **Evidence Correlation**
+   
+   The AI correlates evidence found at the crime scene with suspect statements:
+
+   ```python
+   def correlate_evidence(evidence, statements):
+       correlation = {}
+       
+       for suspect_name, statement in statements.items():
+           correlation[suspect_name] = 0.0
+           
+           # Check for knowledge of evidence they shouldn't have
+           for item in evidence:
+               if item in statement.get('knows_about', []) and not statement.get('has_legitimate_knowledge_of', {}).get(item, False):
+                   correlation[suspect_name] += 1.2
+                   
+           # Check for evidence mentioned in statements
+           for observation in statement.get('heard_or_saw', []):
+               if observation['details'] in evidence:
+                   correlation[suspect_name] -= 0.5  # Openly mentioning evidence may indicate innocence
+                   
+       return correlation
+   ```
+
+5. **Confidence Calculation**
+   
+   The AI determines its confidence level in identifying the culprit:
+
+   ```python
+   def calculate_confidence(top_suspect_score, second_suspect_score, contradictions_found):
+       # Base confidence on the gap between top suspects
+       if second_suspect_score == 0:
+           score_ratio = 1.0
+       else:
+           score_ratio = top_suspect_score / second_suspect_score
+           
+       # Adjust based on contradictions
+       contradiction_factor = min(1.0, len(contradictions_found) * 0.15)
+       
+       # Final confidence calculation
+       confidence = (0.5 * score_ratio) + (0.5 * contradiction_factor)
+       
+       # Normalize to 0-1 range
+       return min(1.0, max(0.1, confidence))
+   ```
+
+### Detective's Investigation Process
+
+The AI detective follows these steps to solve a case:
+
+1. **Initial Evidence Collection**
+   - The detective examines the crime scene evidence
+   - Information about the victim, crime location, and timeline is established
+
+2. **Suspect Interrogation Strategy**
+   - The detective prioritizes suspects based on their relationship to the victim
+   - Questions are tailored to probe for inconsistencies and gauge reactions
+   - Each interrogation builds on knowledge gained from previous ones
+
+3. **Contradiction Analysis**
+   - Statements from different suspects are cross-referenced
+   - Temporal and spatial contradictions are identified (e.g., alibis that don't match witness accounts)
+   - Contradictions are weighted based on their significance to the case
+
+4. **Behavioral Observation**
+   - The detective monitors suspects for signs of deception
+   - Nervousness, confidence, and hesitation are factored into suspicion scoring
+   - Baseline personality traits are considered to avoid false positives
+
+5. **Evidence Mapping**
+   - Evidence is mapped to suspect statements and movements
+   - Access to the crime scene and murder weapon are particularly important
+   - Specialized knowledge about the crime is weighted heavily
+
+6. **Suspicion Scoring**
+   - All factors are combined into a comprehensive suspicion score
+   - Scores are normalized to allow comparison between suspects
+   - The highest scoring suspect is identified as the primary culprit
+
+7. **Confidence Assessment**
+   - The detective evaluates how certain it is of its conclusion
+   - The gap between the top suspect and others affects confidence
+   - The number and quality of contradictions found influence certainty
+
+8. **Deduction Presentation**
+   - The detective presents its reasoning step by step
+   - Key evidence and contradictions are highlighted
+   - The final culprit is named with a confidence percentage
+
+### AI Implementation Decisions
+
+1. **Why Rule-Based Over Machine Learning**
+
+   We chose a rule-based approach with statistical elements instead of a pure machine learning approach for several reasons:
+
+   - **Interpretability**: The detective's reasoning process needs to be transparent and explainable
+   - **Controlled randomness**: The system allows for varying solutions without unpredictable results
+   - **Resource efficiency**: No need for training data or computationally expensive models
+   - **Domain knowledge integration**: Detective heuristics can be directly encoded in rules
+
+2. **Suspicion Scoring Design**
+
+   The suspicion scoring system is designed to mimic human detective work:
+
+   - Multiple small pieces of evidence can accumulate against a suspect
+   - A single major contradiction can significantly increase suspicion
+   - Behavior during questioning affects perception of guilt
+   - Motive and opportunity are weighted as important factors
+
+3. **Confidence Calibration**
+
+   The AI's confidence reporting is calibrated to:
+
+   - Express higher confidence when evidence strongly points to one suspect
+   - Reduce confidence when multiple suspects have similar suspicion levels
+   - Increase with the number of contradictions found (more evidence = more confidence)
+   - Never reach 100% certainty unless there is overwhelming evidence
+
+4. **NPC Guilty Behavior**
+
+   In the visualization, NPCs exhibit behaviors influenced by their guilt level:
+
+   ```python
+   def update_npc_behavior(self, npc):
+       # ... state management ...
+       
+       # Guilt affects speed and movement
+       speed_factor = 0.8 + (npc.get("guilt", 0.1) * 0.5)
+       jitter = npc.get("guilt", 0.1) * 2.0
+       
+       # Add random movement for stressed NPCs
+       dx += random.uniform(-jitter, jitter)
+       dy += random.uniform(-jitter, jitter)
+   ```
+
+   This creates visual cues for the player to observe behavior that the detective AI is analyzing.
+
+### Technical Challenges and Solutions
+
+1. **Balancing Detective Performance**
+
+   Creating an AI detective that is neither too perfect nor too incompetent required careful tuning:
+   - Some randomness is introduced in suspicion scoring
+   - Contradictions vary in how obvious they are to detect
+   - Red herrings are included to occasionally mislead the AI
+
+2. **Procedural Case Generation**
+
+   Generating interesting and solvable cases is challenging:
+   - Each case must have sufficient clues to reach a conclusion
+   - Contradictions must be logical and consistent
+   - Varied case types keep the game interesting
+   - The guilty suspect must leave detectable evidence
+
+3. **Investigation Visualization**
+
+   Translating the detective's internal logic into visible actions required:
+   - A step-by-step deduction presentation
+   - Visualization of the detective's movement between suspects
+   - Clear representation of the interrogation process
+   - Dynamic dialogue that reflects the AI's thought process
+
+### Future AI Enhancements
+
+Potential AI improvements include:
+
+1. **Learning from Past Cases**
+   - Implementing a simple learning mechanism to improve performance over time
+   - Adjusting suspicion weights based on success/failure in previous cases
+
+2. **More Complex Deduction Chains**
+   - Adding multi-step logical inference
+   - Incorporating more advanced temporal reasoning
+
+3. **Suspect Relationship Analysis**
+   - Adding analysis of relationships between suspects
+   - Detecting collusion and false alibis between connected suspects
+
+4. **Adaptive Questioning**
+   - Developing more dynamic questioning based on previous responses
+   - Adding follow-up questions when inconsistencies are detected
 
 ## Key Components
 
@@ -330,22 +604,3 @@ The game combines traditional game development with AI algorithms:
 3. **JSON Case Format**: Standardized format for case information and detective reasoning
 4. **Autonomous Movement System**: Handles pathfinding and character animation
 5. **State Machine**: Manages game phases and transitions
-
-## Development Notes
-
-The detective AI makes decisions based on:
-- Contradictions between suspect statements
-- Suspicious behavior during interrogation
-- Evidence found at the crime scene
-- Relationships between suspects and the victim
-
-The visualization system faithfully represents the detective's thought process and movement throughout the building as it conducts its investigation.
-
-## Future Improvements
-
-Potential future improvements include:
-- More complex case generation with multiple crimes
-- Additional interrogation techniques
-- Improved NPC behavior with more complex movement patterns
-- Additional visual effects and animations
-- Sound effects for different actions
