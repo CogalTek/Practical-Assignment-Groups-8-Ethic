@@ -1,7 +1,7 @@
 # AI Detective Game
 
 <div align="center">
-  <img src="screenshots/image.png" alt="AI Detective Game" width="500">
+  <img src="screenshots/1.png" alt="AI Detective Game" width="500">
   <h3>An AI-powered detective investigation game</h3>
 </div>
 
