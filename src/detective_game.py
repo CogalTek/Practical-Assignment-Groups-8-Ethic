@@ -1,5 +1,8 @@
 import pygame
+import sys
+import time
 import random
+import json
 import math
 from src.assets import load_images, get_player, update_rect
 from src.movement_system import MovementSystem
