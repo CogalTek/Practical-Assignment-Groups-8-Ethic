@@ -1,7 +1,7 @@
 # AI Detective Game
 
 <div align="center">
-  <!-- Suggestion: Ajouter ici une image/logo du jeu -->
+  <img src="screenshots/image.png" alt="AI Detective Game" width="500">
   <h3>An AI-powered detective investigation game</h3>
 </div>
 
